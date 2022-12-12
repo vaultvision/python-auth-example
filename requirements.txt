@@ -1,0 +1,4 @@
+authlib
+flask
+python-dotenv
+requests
