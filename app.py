@@ -2,6 +2,7 @@ import json
 from os import environ, path
 from urllib.parse import quote_plus, urlencode, urljoin, urlparse, urlunparse
 
+import requests
 from authlib.integrations.flask_client import OAuth
 from dotenv import dotenv_values, find_dotenv, load_dotenv
 from flask import Flask, redirect, render_template, session, url_for
@@ -51,9 +52,12 @@ def index():
     }
 
     try:
-        oauth.vaultvision.authorize_redirect(
-            redirect_uri=url_for("auth_callback", _external=True)
+        u = urljoin(
+            app.config.get("VV_ISSUER_URL"),
+            "/.well-known/openid-configuration"
         )
+        res = requests.get(u)
+        res.raise_for_status()
     except Exception as err:
         tpl_ctx["oidc"]["error"] = err
     return render_template("index.html", **tpl_ctx)
