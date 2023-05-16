@@ -63,12 +63,22 @@ def index():
     return render_template("index.html", **tpl_ctx)
 
 
-@app.route("/settings")
-def settings():
-    redir = urljoin(app.config.get("VV_ISSUER_URL"), "/settings")
-    return redirect(redir)
+@app.route("/login")
+def login():
+    return redirect(url_for("auth_login"))
 
 
+# /auth/login kicks off the OIDC flow by redirecting to Vault Vision. Once
+# authentication is complete the user will be returned to /auth/callback.
+@app.route("/auth/login")
+def auth_login():
+    return oauth.vaultvision.authorize_redirect(
+        redirect_uri=url_for("auth_callback", _external=True)
+    )
+
+
+# Once Vault Vision authenticates a user they will be sent here to complete
+# the OIDC flow.
 @app.route("/auth/callback", methods=["GET", "POST"])
 def auth_callback():
     oauth.vaultvision.authorize_access_token()
@@ -82,18 +92,8 @@ def auth_callback():
     return redirect("/")
 
 
-@app.route("/login")
-def login():
-    return redirect(url_for("auth_login"))
-
-
-@app.route("/auth/login")
-def auth_login():
-    return oauth.vaultvision.authorize_redirect(
-        redirect_uri=url_for("auth_callback", _external=True)
-    )
-
-
+# Logout clears the cookies and then sends the users to Vault Vision to clear
+# the session, then Vault Vision will redirect the user to /auth/logout.
 @app.route("/logout")
 def logout():
     session.clear()
@@ -111,6 +111,27 @@ def logout():
 @app.route("/auth/logout")
 def auth_logout():
     return redirect(url_for("index"))
+
+
+# /settings just redirects to /auth/settings. But it could contain any app 
+# specific logic or a confirmation page that shows a settings button.
+@app.route("/settings")
+def settings():
+    return redirect("/auth/settings")
+
+
+# /auth/settings redirects to the Vault Vision settings page so users can
+# manage their email, password, social logins, webauthn credentials and more.
+# 
+# This works by using an oidc prompt named "settings". When the user returns
+# your session will be updated to reflect any changes they made.
+@app.route("/auth/settings")
+def auth_settings():
+    redir = url_for("auth_callback", _external=True)
+    return oauth.vaultvision.authorize_redirect(
+        redirect_uri=redir,
+        prompt="settings",
+    )
 
 
 if __name__ == "__main__":
